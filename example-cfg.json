@@ -1,0 +1,13 @@
+{
+	"_comment1" : "Any long-format command line argument ",
+	"_comment2" : "may be used in this JSON configuration file",
+
+	"url" : "stratum+tcp://hodl.blockquarry.com:8332/",
+	"user" : "Cheeto.1",
+	"pass" : "",
+
+	"algo" : "hodl",
+	"threads" : "16",
+
+	"quiet" : true
+}
