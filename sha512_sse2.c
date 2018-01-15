@@ -23,6 +23,10 @@
 //Shift right operation
 #define SHR64(a, n) _mm_srli_epi64(a, n)
 
+#define long long long
+#define ulong unsigned long
+#define htobe64(x) __builtin_bswap64(x)
+
 __m128i mm_htobe_epi64(__m128i a) {
   __m128i mask = _mm_set_epi8(8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7);
   return _mm_shuffle_epi8(a, mask);
