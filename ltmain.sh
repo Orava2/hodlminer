@@ -431,6 +431,7 @@ sed_double_backslash="\
 opt_dry_run=false
 opt_help=false
 opt_quiet=false
+opt_timing=false
 opt_verbose=false
 opt_warning=:
 
@@ -1127,6 +1128,10 @@ func_append preserve_args " $opt"
 			;;
       --silent|--quiet)
 			opt_silent=:
+func_append preserve_args " $opt"
+			;;
+      --timing|-w)
+			opt_timing=:
 func_append preserve_args " $opt"
         opt_verbose=false
 			;;

@@ -123,6 +123,7 @@ bool have_stratum = false;
 bool use_syslog = false;
 static bool opt_background = false;
 static bool opt_quiet = false;
+static bool opt_timing = false;
 static int opt_retries = -1;
 static int opt_fail_pause = 30;
 int opt_timeout = 0;
@@ -157,6 +158,9 @@ pthread_barrier_t bar;
 static unsigned long accepted_count = 0L;
 static unsigned long rejected_count = 0L;
 static double *thr_hashrates;
+static double *thr_hashcounts;
+static double *thr_times;
+
 
 //char *scratchpad = NULL;
 CacheEntry *scratchpad = NULL;
@@ -199,6 +203,7 @@ Options:\n\
       --no-stratum      disable X-Stratum support\n\
       --no-redirect     ignore requests to change the URL of the mining server\n\
   -q, --quiet           disable per-thread hashmeter output\n\
+  -w, --timing			show timing for execution\n\
   -D, --debug           enable debug output\n\
   -P, --protocol-dump   verbose dump of protocol-level activities\n"
 #ifdef HAVE_SYSLOG_H
@@ -247,6 +252,7 @@ static struct option const options[] = {
 	{ "protocol-dump", 0, NULL, 'P' },
 	{ "proxy", 1, NULL, 'x' },
 	{ "quiet", 0, NULL, 'q' },
+	{ "timing", 0, NULL, 'w' },
 	{ "retries", 1, NULL, 'r' },
 	{ "retry-pause", 1, NULL, 'R' },
 	{ "scantime", 1, NULL, 's' },
@@ -1078,6 +1084,7 @@ static void *miner_thread(void *userdata)
 	uint32_t end_nonce = 0xffffffffU / opt_n_threads * (thr_id + 1) - 0x20;
 	char s[1000];
 	int i;
+	double max_time;
 
 	/* Set worker threads to nice 19 and then preferentially to SCHED_IDLE
 	 * and if that fails, then SCHED_BATCH. No need for this to be an
@@ -1100,6 +1107,9 @@ static void *miner_thread(void *userdata)
 		unsigned long hashes_done;
 		struct timeval tv_start, tv_mid, tv_end, diff;
 		int rc;
+
+		// Get start time.
+		gettimeofday(&tv_start, NULL);
 
 		pthread_barrier_wait( &bar );
 		if(thr_id == 0) {
@@ -1147,32 +1157,58 @@ static void *miner_thread(void *userdata)
         }
 		work.data[19] = swab32(nNonce);
 
-		gettimeofday(&tv_start, NULL);
+		// Print timing information if opt_timing is true.
+		if (opt_timing) {
+			gettimeofday(&tv_mid, NULL);
+			timeval_subtract(&diff, &tv_mid, &tv_start);
+			printf("1. Delay to start GenRandomGarbage: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
+			gettimeofday(&tv_mid, NULL);
+		}
+	
 		GenRandomGarbage(scratchpad, opt_n_threads, work.data, thr_id);
-
-		gettimeofday(&tv_mid, NULL);
-		timeval_subtract(&diff, &tv_mid, &tv_start);
-		printf("Time for GenRandomGarbage: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
-
+		
+		if (opt_timing) {
+			gettimeofday(&tv_end, NULL);
+			timeval_subtract(&diff, &tv_end, &tv_mid);
+			printf("2. Time for GenRandomGarbage: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
+			gettimeofday(&tv_mid, NULL);
+		}
+		
 		pthread_barrier_wait( &bar );
-		gettimeofday(&tv_mid, NULL);
 
 		work_restart[thr_id].restart = 0;
-		
+
+		if (opt_timing) {
+			gettimeofday(&tv_end, NULL);
+			timeval_subtract(&diff, &tv_end, &tv_mid);
+			printf("3. Delay to start scanhash_hodl: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
+			gettimeofday(&tv_mid, NULL);
+		}
+
 		hashes_done = 0;
 
 		/* scan nonces for a proof-of-work hash */
 		rc = scanhash_hodl(thr_id, opt_n_threads, work.data, scratchpad, work.target, &hashes_done);
 
+		if (opt_timing) {
+			gettimeofday(&tv_end, NULL);
+			timeval_subtract(&diff, &tv_end, &tv_mid);
+			printf("4. Time for scanhash_hodl: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
+			gettimeofday(&tv_mid, NULL);
+		}
+
 		/* record scanhash elapsed time */
 		gettimeofday(&tv_end, NULL);
-
-		timeval_subtract(&diff, &tv_end, &tv_mid);
 		timeval_subtract(&diff, &tv_end, &tv_start);
+	
 		if (diff.tv_usec || diff.tv_sec) {
 			pthread_mutex_lock(&stats_lock);
 			thr_hashrates[thr_id] =
 				hashes_done / (diff.tv_sec + 1e-6 * diff.tv_usec);
+			// Let's save hash count to a table.
+			thr_hashcounts[thr_id] = hashes_done;
+			// Let's thred times count to a table.
+			thr_times[thr_id] = (diff.tv_sec + 1e-6 * diff.tv_usec);
 			pthread_mutex_unlock(&stats_lock);
 		}
 		if (!opt_quiet) {
@@ -1183,16 +1219,36 @@ static void *miner_thread(void *userdata)
 		}
 		if (opt_benchmark && thr_id == opt_n_threads - 1) {
 			double hashrate = 0.;
-			for (i = 0; i < opt_n_threads && thr_hashrates[i]; i++)
+			long hashcount = 0;
+			max_time = 0;
+			for (i = 0; i < opt_n_threads && thr_hashrates[i]; i++){
 				hashrate += thr_hashrates[i];
+				hashcount += thr_hashcounts[i];
+				
+				// Take longest thread time.
+				if (thr_times[i] > max_time ){
+					max_time = thr_times[i];
+				}
+			}
 			if (i == opt_n_threads) {
 				sprintf(s, hashrate >= 1e6 ? "%.0f" : "%.2f", hashrate);
 				applog(LOG_INFO, "Total: %s hash/s", s);
+				
+				hashrate =	hashcount / (max_time);
+				sprintf(s, hashrate >= 1e6 ? "%.0f" : "%.2f", hashrate);
+				applog(LOG_INFO, "More precise total: %s hash/s", s);
 			}
 		}
 		/* if nonce found, submit work */
 		if (rc && !opt_benchmark && !submit_work(mythr, &work))
 			break;
+		/*	
+		if (opt_timing) {
+			gettimeofday(&tv_end, NULL);
+			timeval_subtract(&diff, &tv_end, &tv_mid);
+			printf("5. Time delay to end: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
+		*/
+		}
 	}
 
 out:
@@ -1517,6 +1573,9 @@ static void parse_arg(int key, char *arg, char *pname)
 		json_decref(config);
 		break;
 	}
+	case 'w':
+		opt_timing = true;
+		break;
 	case 'q':
 		opt_quiet = true;
 		break;
@@ -1869,6 +1928,15 @@ int main(int argc, char *argv[])
 	thr_hashrates = (double *) calloc(opt_n_threads, sizeof(double));
 	if (!thr_hashrates)
 		return 1;
+
+	thr_times = (double *) calloc(opt_n_threads, sizeof(double));
+	if (!thr_times)
+		return 1;
+
+	thr_hashcounts = (long *) calloc(opt_n_threads, sizeof(long));
+	if (!thr_hashcounts)
+		return 1;
+
 
 	/* init workio thread info */
 	work_thr_id = opt_n_threads;
