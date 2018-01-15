@@ -158,7 +158,7 @@ pthread_barrier_t bar;
 static unsigned long accepted_count = 0L;
 static unsigned long rejected_count = 0L;
 static double *thr_hashrates;
-static double *thr_hashcounts;
+static long *thr_hashcounts;
 static double *thr_times;
 
 
@@ -1111,7 +1111,8 @@ static void *miner_thread(void *userdata)
 		// Get start time.
 		gettimeofday(&tv_start, NULL);
 
-		pthread_barrier_wait( &bar );
+		// barrier disabled
+		//pthread_barrier_wait( &bar );
 		if(thr_id == 0) {
 		    if (have_stratum) {
                 while (time(NULL) >= g_work_time + 120)
@@ -1156,12 +1157,12 @@ static void *miner_thread(void *userdata)
             work_copy(&work, &hodl_work);
         }
 		work.data[19] = swab32(nNonce);
-
+		
 		// Print timing information if opt_timing is true.
 		if (opt_timing) {
 			gettimeofday(&tv_mid, NULL);
 			timeval_subtract(&diff, &tv_mid, &tv_start);
-			printf("1. Delay to start GenRandomGarbage: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
+			printf("1. Delay to start GenRandomGarbage (%d): %f\n", thr_id, (diff.tv_sec + 1e-6 * diff.tv_usec));
 			gettimeofday(&tv_mid, NULL);
 		}
 	
@@ -1170,7 +1171,7 @@ static void *miner_thread(void *userdata)
 		if (opt_timing) {
 			gettimeofday(&tv_end, NULL);
 			timeval_subtract(&diff, &tv_end, &tv_mid);
-			printf("2. Time for GenRandomGarbage: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
+			printf("2. Time for GenRandomGarbage (%d): %f\n", thr_id, (diff.tv_sec + 1e-6 * diff.tv_usec));
 			gettimeofday(&tv_mid, NULL);
 		}
 		
@@ -1181,7 +1182,7 @@ static void *miner_thread(void *userdata)
 		if (opt_timing) {
 			gettimeofday(&tv_end, NULL);
 			timeval_subtract(&diff, &tv_end, &tv_mid);
-			printf("3. Delay to start scanhash_hodl: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
+			printf("3. Delay to start scanhash_hodl (%d): %f\n", thr_id, (diff.tv_sec + 1e-6 * diff.tv_usec));
 			gettimeofday(&tv_mid, NULL);
 		}
 
@@ -1193,7 +1194,7 @@ static void *miner_thread(void *userdata)
 		if (opt_timing) {
 			gettimeofday(&tv_end, NULL);
 			timeval_subtract(&diff, &tv_end, &tv_mid);
-			printf("4. Time for scanhash_hodl: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
+			printf("4. Time for scanhash_hodl (%d): %f\n", thr_id, (diff.tv_sec + 1e-6 * diff.tv_usec));
 			gettimeofday(&tv_mid, NULL);
 		}
 
@@ -1246,9 +1247,10 @@ static void *miner_thread(void *userdata)
 		if (opt_timing) {
 			gettimeofday(&tv_end, NULL);
 			timeval_subtract(&diff, &tv_end, &tv_mid);
-			printf("5. Time delay to end: %f\n", (diff.tv_sec + 1e-6 * diff.tv_usec));
-		*/
+			printf("5. Time delay to end (%d): %f\n", thr_id, (diff.tv_sec + 1e-6 * diff.tv_usec));
 		}
+		*/
+				
 	}
 
 out:
