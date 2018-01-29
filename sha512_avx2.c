@@ -25,9 +25,10 @@
 
 #ifdef WIN32
 #define long long long
+#endif
 #define ulong unsigned long
 #define htobe64(x) __builtin_bswap64(x)
-#endif
+
 
 __m256i mm256_htobe_epi64(__m256i a) {
   __m256i mask = _mm256_set_epi8(

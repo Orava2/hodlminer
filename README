@@ -20,6 +20,9 @@ Ubuntu and Debian build instructions:
 	./configure CFLAGS="-O3 -march=native"
 	make
 
+Windows 64 bit build instructions:
+	...
+	
 
 -----------------------------------------------------------------------
 
