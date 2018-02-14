@@ -42,6 +42,16 @@
 #define PROGRAM_NAME		"hodlminer"
 #define LP_SCANTIME		60
 
+// Colors for text.
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
+
 #ifdef __linux /* Linux specific policy and affinity management */
 #include <sched.h>
 static inline void drop_policy(void)
@@ -160,6 +170,10 @@ static unsigned long rejected_count = 0L;
 static double *thr_hashrates;
 static long *thr_hashcounts;
 static double *thr_times;
+
+// New average hash rate calculations
+static double average=0.0;
+static int n_avg=0;
 
 
 //char *scratchpad = NULL;
@@ -634,23 +648,83 @@ out:
 static void share_result(int result, const char *reason)
 {
 	char s[345];
+	char s2[345];
 	double hashrate;
+	long hashcount = 0;
 	int i;
+	double max_time=0.0;
+	
+	// Samples for average.
+	#define BUFF_SIZE 10
+	static double sample_buffer[BUFF_SIZE];
+	// Position of the lastest sample in the buffer.
+	static int n_pos = 0;
+	static int n=0;
+	
 
 	hashrate = 0.;
 	pthread_mutex_lock(&stats_lock);
-	for (i = 0; i < opt_n_threads; i++)
-		hashrate += thr_hashrates[i];
+	for (i = 0; i < opt_n_threads; i++){
+		hashcount += thr_hashcounts[i];
+	
+		// Take longest thread time.
+		if (thr_times[i] > max_time ){
+			max_time = thr_times[i];
+		}
+	}	
+
+	hashrate =	hashcount / (max_time);
+		
 	result ? accepted_count++ : rejected_count++;
 	pthread_mutex_unlock(&stats_lock);
 	
+	// Calculate average.
+	// Add a new sample to buffer.
+	sample_buffer[n_pos] = hashrate;
+	// Update position for next sample.
+	n_pos = (n_pos+1)%BUFF_SIZE;
+	average = 0.0;
+	for (i=0; i<BUFF_SIZE; i++){
+		average += sample_buffer[i];
+	}
+	// n keeps tracks how many samples are in the buffer.
+	// Max value for n is 10
+	if(n<BUFF_SIZE){
+		n++;
+	}else{
+		n=BUFF_SIZE;
+	}
+	average = average/n;
+	
 	sprintf(s, hashrate >= 1e6 ? "%.0f" : "%.2f", hashrate);
-	applog(LOG_INFO, "accepted: %lu/%lu (%.2f%%), %s hash/s %s",
-		   accepted_count,
-		   accepted_count + rejected_count,
-		   100. * accepted_count / (accepted_count + rejected_count),
-		   s,
-		   result ? "(yay!!!)" : "(booooo)");
+	sprintf(s2, hashrate >= 1e6 ? "%.0f" : "%.2f", average);
+//	applog(LOG_INFO, "accepted %lu/%lu (%.2f%%), %s h/s (avg of %d last samples %s h/s) %s",
+//		   accepted_count,
+//		   accepted_count + rejected_count,
+//		   100. * accepted_count / (accepted_count + rejected_count),
+//		   s,
+//		   n,
+//		   s2,
+//		   result ? "(yay!!!)" : "(booooo)");
+
+	if (result){
+			applog(LOG_INFO, ANSI_COLOR_GREEN "accepted " ANSI_COLOR_RESET  "%lu/%lu (%.2f%%), " ANSI_COLOR_CYAN "%s " ANSI_COLOR_RESET "h/s (avg of %d last samples " ANSI_COLOR_MAGENTA "%s " ANSI_COLOR_RESET "h/s) (yay!!!)",
+			accepted_count,
+			accepted_count + rejected_count,
+			100. * accepted_count / (accepted_count + rejected_count),
+			s,
+			n,
+			s2);
+	} else {
+			applog(LOG_INFO, ANSI_COLOR_RED "accepted " ANSI_COLOR_RESET "%lu/%lu (%.2f%%), " ANSI_COLOR_CYAN "%s " ANSI_COLOR_RESET "h/s (avg of %d last samples " ANSI_COLOR_MAGENTA "%s " ANSI_COLOR_RESET "h/s) (booooo)",
+			accepted_count,
+			accepted_count + rejected_count,
+			100. * accepted_count / (accepted_count + rejected_count),
+			s,
+			n,
+			s2);
+	}
+
 
 	if (opt_debug && reason)
 		applog(LOG_DEBUG, "DEBUG: reject reason: %s", reason);
@@ -1083,9 +1157,11 @@ static void *miner_thread(void *userdata)
 	struct work work = {{0}};
 	uint32_t end_nonce = 0xffffffffU / opt_n_threads * (thr_id + 1) - 0x20;
 	char s[1000];
+	char s2[1000];
 	int i;
 	double max_time;
-
+	
+	
 	/* Set worker threads to nice 19 and then preferentially to SCHED_IDLE
 	 * and if that fails, then SCHED_BATCH. No need for this to be an
 	 * error if it fails */
@@ -1208,7 +1284,7 @@ static void *miner_thread(void *userdata)
 				hashes_done / (diff.tv_sec + 1e-6 * diff.tv_usec);
 			// Let's save hash count to a table.
 			thr_hashcounts[thr_id] = hashes_done;
-			// Let's thred times count to a table.
+			// Let's save thread times to a table.
 			thr_times[thr_id] = (diff.tv_sec + 1e-6 * diff.tv_usec);
 			pthread_mutex_unlock(&stats_lock);
 		}
@@ -1232,12 +1308,16 @@ static void *miner_thread(void *userdata)
 				}
 			}
 			if (i == opt_n_threads) {
-				sprintf(s, hashrate >= 1e6 ? "%.0f" : "%.2f", hashrate);
-				applog(LOG_INFO, "Total: %s hash/s", s);
-				
+				//sprintf(s, hashrate >= 1e6 ? "%.0f" : "%.2f", hashrate);
+				//applog(LOG_INFO, "Total: %s hash/s", s);
 				hashrate =	hashcount / (max_time);
+				average = (n_avg*average + hashrate)/(n_avg + 1);
+				n_avg++;
 				sprintf(s, hashrate >= 1e6 ? "%.0f" : "%.2f", hashrate);
-				applog(LOG_INFO, "More precise total: %s hash/s", s);
+				sprintf(s2, average >= 1e6 ? "%.0f" : "%.2f", average);
+				applog(LOG_INFO, "Accurate total " ANSI_COLOR_CYAN "%s " ANSI_COLOR_RESET "h/s (avg " ANSI_COLOR_MAGENTA "%s " ANSI_COLOR_RESET "h/s)", s, s2);
+								
+				
 			}
 		}
 		/* if nonce found, submit work */
