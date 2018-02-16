@@ -43,13 +43,19 @@
 #define LP_SCANTIME		60
 
 // Colors for text.
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_GREEN   "\x1b[32m"
-#define ANSI_COLOR_YELLOW  "\x1b[33m"
-#define ANSI_COLOR_BLUE    "\x1b[34m"
-#define ANSI_COLOR_MAGENTA "\x1b[35m"
-#define ANSI_COLOR_CYAN    "\x1b[36m"
-#define ANSI_COLOR_RESET   "\x1b[0m"
+#define COLOR_RED     "\x1b[31m"
+#define COLOR_GREEN   "\x1b[32m"
+#define COLOR_YELLOW  "\x1b[33m"
+#define COLOR_BLUE    "\x1b[34m"
+#define COLOR_MAGENTA "\x1b[35m"
+#define COLOR_CYAN    "\x1b[36m"
+#define COLOR_RED_BR     "\x1b[91m"
+#define COLOR_GREEN_BR   "\x1b[92m"
+#define COLOR_YELLOW_BR  "\x1b[93m"
+#define COLOR_BLUE_BR    "\x1b[94m"
+#define COLOR_MAGENTA_BR "\x1b[95m"
+#define COLOR_CYAN_BR    "\x1b[96m"
+#define COLOR_RESET   "\x1b[0m"
 
 
 #ifdef __linux /* Linux specific policy and affinity management */
@@ -175,6 +181,7 @@ static double *thr_times;
 static double average=0.0;
 static int n_avg=0;
 
+static int colors_enabled;
 
 //char *scratchpad = NULL;
 CacheEntry *scratchpad = NULL;
@@ -653,14 +660,14 @@ static void share_result(int result, const char *reason)
 	long hashcount = 0;
 	int i;
 	double max_time=0.0;
-	
+
 	// Samples for average.
 	#define BUFF_SIZE 10
 	static double sample_buffer[BUFF_SIZE];
 	// Position of the lastest sample in the buffer.
 	static int n_pos = 0;
 	static int n=0;
-	
+	static double average=0.0;
 
 	hashrate = 0.;
 	pthread_mutex_lock(&stats_lock);
@@ -706,23 +713,32 @@ static void share_result(int result, const char *reason)
 //		   n,
 //		   s2,
 //		   result ? "(yay!!!)" : "(booooo)");
-
 	if (result){
-			applog(LOG_INFO, ANSI_COLOR_GREEN "accepted " ANSI_COLOR_RESET  "%lu/%lu (%.2f%%), " ANSI_COLOR_CYAN "%s " ANSI_COLOR_RESET "h/s (avg of %d last samples " ANSI_COLOR_MAGENTA "%s " ANSI_COLOR_RESET "h/s) (yay!!!)",
+			applog(LOG_INFO, "%saccepted%s %lu/%lu (%.2f%%), %s%s%s h/s (avg of %d last samples %s%s%s h/s) (yay!!!)",
+			colors_enabled ? COLOR_GREEN_BR : "", colors_enabled ? COLOR_RESET : "", // Colors for "accepted".
 			accepted_count,
 			accepted_count + rejected_count,
 			100. * accepted_count / (accepted_count + rejected_count),
+			colors_enabled ? COLOR_CYAN_BR : "", // Color for hash rate.
 			s,
+			colors_enabled ? COLOR_RESET : "",
 			n,
-			s2);
+			colors_enabled ? COLOR_MAGENTA_BR : "", // Color for average hash rate.
+			s2,
+			colors_enabled ? COLOR_RESET : "");
 	} else {
-			applog(LOG_INFO, ANSI_COLOR_RED "accepted " ANSI_COLOR_RESET "%lu/%lu (%.2f%%), " ANSI_COLOR_CYAN "%s " ANSI_COLOR_RESET "h/s (avg of %d last samples " ANSI_COLOR_MAGENTA "%s " ANSI_COLOR_RESET "h/s) (booooo)",
+			applog(LOG_INFO, "%saccepted%s %lu/%lu (%.2f%%), %s%s%s h/s (avg of %d last samples %s%s%s h/s) (booooo)",
+			colors_enabled ? COLOR_RED_BR : "", colors_enabled ? COLOR_RESET : "", // Colors for "accepted".
 			accepted_count,
 			accepted_count + rejected_count,
 			100. * accepted_count / (accepted_count + rejected_count),
+			colors_enabled ? COLOR_CYAN_BR : "", // Color for hash rate.
 			s,
+			colors_enabled ? COLOR_RESET : "",
 			n,
-			s2);
+			colors_enabled ? COLOR_MAGENTA_BR : "", // Color for average hash rate.
+			s2,
+			colors_enabled ? COLOR_RESET : "");
 	}
 
 
@@ -1161,6 +1177,9 @@ static void *miner_thread(void *userdata)
 	int i;
 	double max_time;
 	
+	static double average=0.0;
+	static int n_avg=0;
+	
 	
 	/* Set worker threads to nice 19 and then preferentially to SCHED_IDLE
 	 * and if that fails, then SCHED_BATCH. No need for this to be an
@@ -1315,7 +1334,13 @@ static void *miner_thread(void *userdata)
 				n_avg++;
 				sprintf(s, hashrate >= 1e6 ? "%.0f" : "%.2f", hashrate);
 				sprintf(s2, average >= 1e6 ? "%.0f" : "%.2f", average);
-				applog(LOG_INFO, "Accurate total " ANSI_COLOR_CYAN "%s " ANSI_COLOR_RESET "h/s (avg " ANSI_COLOR_MAGENTA "%s " ANSI_COLOR_RESET "h/s)", s, s2);
+				applog(LOG_INFO, "Accurate total %s%s%s h/s (avg %s%s%s h/s)",
+				colors_enabled ? COLOR_CYAN_BR : "",
+				s,
+				colors_enabled ? COLOR_RESET : "",
+				colors_enabled ? COLOR_MAGENTA_BR : "",
+				s2,
+				colors_enabled ? COLOR_RESET : "");
 								
 				
 			}
@@ -1924,6 +1949,26 @@ int main(int argc, char *argv[])
 	struct thr_info *thr;
 	long flags;
 	int i;
+
+#ifdef WIN32
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+DWORD dwMode = 0;
+GetConsoleMode(hOut, &dwMode);
+dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+if (SetConsoleMode(hOut, dwMode)){
+	colors_enabled = 1;
+} else {
+	colors_enabled = 0;
+}
+#endif
+
+#ifndef WIN32
+	colors_enabled = 1;
+#endif
+
 
 	rpc_user = strdup("");
 	rpc_pass = strdup("");
