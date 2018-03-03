@@ -11,6 +11,9 @@
 
 void GenerateGarbageCore(CacheEntry *Garbage, int ThreadID, int ThreadCount, void *MidHash)
 {
+
+#ifdef __AVX__
+// This code works best with AVX autovectorization.
     uint64_t* TempBufs[SHA512_PARALLEL_N];
     uint64_t* desination[SHA512_PARALLEL_N];
 
@@ -31,6 +34,21 @@ void GenerateGarbageCore(CacheEntry *Garbage, int ThreadID, int ThreadCount, voi
     for (int i=0; i<SHA512_PARALLEL_N; ++i) {
         free(TempBufs[i]);
     }
+
+#else
+// This code is for SSE2 autovectorization
+	uint32_t TempBuf[8];
+    memcpy( TempBuf, MidHash, 32 );
+
+    uint32_t StartChunk = ThreadID * (TOTAL_CHUNKS / ThreadCount);
+    for ( uint32_t i = StartChunk;
+          i < StartChunk + (TOTAL_CHUNKS / ThreadCount); ++i )
+    {
+        TempBuf[0] = i;
+        SHA512( ( uint8_t *)TempBuf, 32,
+                ( (uint8_t *)Garbage ) + ( i * GARBAGE_CHUNK_SIZE ) );
+	}
+#endif
 }
 
 void Rev256(uint32_t *Dest, const uint32_t *Src)
