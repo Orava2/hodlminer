@@ -12,8 +12,8 @@
 void GenerateGarbageCore(CacheEntry *Garbage, int ThreadID, int ThreadCount, void *MidHash)
 {
 
-#ifdef __AVX__
-// This code works best with AVX autovectorization.
+#ifdef __SSE2__
+// Code for SSE2, AVX and AVX2
     uint64_t* TempBufs[SHA512_PARALLEL_N];
     uint64_t* desination[SHA512_PARALLEL_N];
 
@@ -36,7 +36,7 @@ void GenerateGarbageCore(CacheEntry *Garbage, int ThreadID, int ThreadCount, voi
     }
 
 #else
-// This code is for SSE2 autovectorization
+// This code calls OpenSSL SHA512. Intel SHA extension support?
 	uint32_t TempBuf[8];
     memcpy( TempBuf, MidHash, 32 );
 
