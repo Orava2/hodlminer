@@ -12,7 +12,7 @@
 void GenerateGarbageCore(CacheEntry *Garbage, int ThreadID, int ThreadCount, void *MidHash)
 {
 
-#ifdef __SSE2__
+#ifndef __SHA__
 // Code for SSE2, AVX and AVX2
     uint64_t* TempBufs[SHA512_PARALLEL_N];
     uint64_t* desination[SHA512_PARALLEL_N];
