@@ -12,7 +12,7 @@
 void GenerateGarbageCore(CacheEntry *Garbage, int ThreadID, int ThreadCount, void *MidHash)
 {
 
-#ifndef __SHA__
+#ifndef __AVX512F__
 // Code for SSE2, AVX and AVX2
     uint64_t* TempBufs[SHA512_PARALLEL_N];
     uint64_t* desination[SHA512_PARALLEL_N];
@@ -36,7 +36,7 @@ void GenerateGarbageCore(CacheEntry *Garbage, int ThreadID, int ThreadCount, voi
     }
 
 #else
-// This code calls OpenSSL SHA512. Intel SHA extension support?
+// This code calls OpenSSL SHA512. AVX512F extension support?
 	uint32_t TempBuf[8];
     memcpy( TempBuf, MidHash, 32 );
 

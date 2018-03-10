@@ -662,7 +662,7 @@ static void share_result(int result, const char *reason)
 	double max_time=0.0;
 
 	// Samples for average.
-	#define BUFF_SIZE 10
+	#define BUFF_SIZE 100
 	static double sample_buffer[BUFF_SIZE];
 	// Position of the lastest sample in the buffer.
 	static int n_pos = 0;
