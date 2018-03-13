@@ -121,12 +121,13 @@ static inline void AES256Core(__m128i* State, __m128i ExpandedKey[][16])
     }        
 }
 
-void AES256CBC(__m128i** data, const __m128i** next, __m128i ExpandedKey[][16], __m128i* IV)
+void AES256CBC(__m128i** data, const __m128i** old, const __m128i** next, __m128i ExpandedKey[][16], __m128i* IV)
 {
     const uint32_t N = AES_PARALLEL_N;
     __m128i State[N];
     for(int j=0; j<N; ++j) {
-        State[j] = _mm_xor_si128( _mm_xor_si128(data[j][0], next[j][0]), IV[j]);
+    	__m128i n = _mm_stream_load_si128(&next[j][0]);
+        State[j] = _mm_xor_si128( _mm_xor_si128(old[j][0], n), IV[j]);
     }
 
     AES256Core(State, ExpandedKey);
@@ -136,7 +137,8 @@ void AES256CBC(__m128i** data, const __m128i** next, __m128i ExpandedKey[][16], 
 
     for(int i = 1; i < BLOCK_COUNT; ++i) {
         for(int j=0; j<N; ++j) {
-            State[j] = _mm_xor_si128( _mm_xor_si128(data[j][i], next[j][i]), data[j][i - 1]);
+        	__m128i n = _mm_stream_load_si128(&next[j][i]);
+            State[j] = _mm_xor_si128( _mm_xor_si128(data[j][i], n), old[j][i - 1]);
         }
         AES256Core(State, ExpandedKey);
         for(int j=0; j<N; ++j) {

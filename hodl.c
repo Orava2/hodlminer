@@ -34,7 +34,7 @@ void GenerateGarbageCore(CacheEntry *Garbage, int ThreadID, int ThreadCount, voi
     for (int i=0; i<SHA512_PARALLEL_N; ++i) {
         free(TempBufs[i]);
     }
-
+	
 #else
 // This code calls OpenSSL SHA512. AVX512F extension support?
 	uint32_t TempBuf[8];
@@ -62,6 +62,7 @@ int scanhash_hodl(int threadNumber, int totalThreads, uint32_t *pdata, const Cac
     CacheEntry Cache[AES_PARALLEL_N];
 
     __m128i* data[AES_PARALLEL_N];
+    __m128i* data0[AES_PARALLEL_N];
     const __m128i* next[AES_PARALLEL_N];
 
     for(int n=0; n<AES_PARALLEL_N; ++n) {
@@ -77,6 +78,7 @@ int scanhash_hodl(int threadNumber, int totalThreads, uint32_t *pdata, const Cac
         // Copy data
         for (int n=0; n<AES_PARALLEL_N; ++n) {
             memcpy(Cache[n].dwords, Garbage + k + n, GARBAGE_SLICE_SIZE);
+        	//data0[n] = Garbage[k+n].dqwords;
         }
 
         for(int j = 0; j < AES_ITERATIONS; ++j)
@@ -86,19 +88,33 @@ int scanhash_hodl(int threadNumber, int totalThreads, uint32_t *pdata, const Cac
 
             // use last 4 bytes of first cache as next location
             for(int n=0; n<AES_PARALLEL_N; ++n) {
-                uint32_t nextLocation = Cache[n].dwords[(GARBAGE_SLICE_SIZE >> 2) - 1] & (COMPARE_SIZE - 1); //% COMPARE_SIZE;
+            	uint32_t nextLocation;
+            	if (j == 0) {
+            		nextLocation = Garbage[k+n].dwords[(GARBAGE_SLICE_SIZE >> 2) - 1] & (COMPARE_SIZE - 1); //% COMPARE_SIZE;
+            	} else {
+            		nextLocation = Cache[n].dwords[(GARBAGE_SLICE_SIZE >> 2) - 1] & (COMPARE_SIZE - 1); //% COMPARE_SIZE;
+            	}
                 next[n] = Garbage[nextLocation].dqwords;
 
                 __m128i last[2];
-                last[0] = _mm_xor_si128(Cache[n].dqwords[254], next[n][254]);
-                last[1] = _mm_xor_si128(Cache[n].dqwords[255], next[n][255]);
+                if (j == 0) {
+                	last[0] = _mm_xor_si128(Garbage[k+n].dqwords[254], next[n][254]);
+                	last[1] = _mm_xor_si128(Garbage[k+n].dqwords[255], next[n][255]);
+                } else {
+                	last[0] = _mm_xor_si128(Cache[n].dqwords[254], next[n][254]);
+                	last[1] = _mm_xor_si128(Cache[n].dqwords[255], next[n][255]);
+                }
 
                 // Key is last 32b of Cache
                 // IV is last 16b of Cache
                 ExpandAESKey256(ExpKey[n], last);
                 ivs[n] = last[1];
             }
-            AES256CBC(data, next, ExpKey, ivs);
+            if (j == 0) {
+            	AES256CBC(data, data, next, ExpKey, ivs);
+            } else {
+            	AES256CBC(data, data, next, ExpKey, ivs);
+            }
         }
 
         // use last X bits as solution

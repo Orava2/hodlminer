@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
 #if HAVE_SYS_SYSCTL_H
 #include <sys/types.h>
 #if HAVE_SYS_PARAM_H
@@ -2118,7 +2119,16 @@ if (SetConsoleMode(hOut, dwMode)){
 	if (opt_algo == ALGO_HODL )
 	{
 		#ifdef __linux__
-		scratchpad = (CacheEntry *)aligned_alloc(16, 1 << 30);
+		// scratchpad = (CacheEntry *)aligned_alloc(16, 1 << 30);
+		scratchpad = (CacheEntry*)mmap(NULL, 1 << 30, PROT_READ | PROT_WRITE,  (MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB), -1, 0);
+		if (scratchpad == MAP_FAILED) {
+			applog(LOG_INFO, "Could not mmap scratchpad with MAP_HUGETLB. Execute 'echo 512 > /proc/sys/vm/nr_hugepages' to allocate hugepages.");
+			scratchpad = (CacheEntry*)mmap(NULL, 1 << 30, PROT_READ | PROT_WRITE,  (MAP_PRIVATE | MAP_ANONYMOUS ), -1, 0);
+		}
+		if (scratchpad == MAP_FAILED) {
+			applog(LOG_ERR, "mmap failed. Could not allocate scratchpad.");
+			return 1;
+		}
 		#else
 		scratchpad= (CacheEntry *)malloc(1<<30);
 		#endif
