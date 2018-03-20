@@ -728,7 +728,7 @@ static void share_result(int result, const char *reason)
 			s2,
 			colors_enabled ? COLOR_RESET : "");
 	} else {
-			applog(LOG_INFO, "%saccepted%s %lu/%lu (%.2f%%), %s%s%s h/s (avg of %d last samples %s%s%s h/s) (booooo)",
+			applog(LOG_INFO, "%srejected%s %lu/%lu (%.2f%%), %s%s%s h/s (avg of %d last samples %s%s%s h/s) (booooo)",
 			colors_enabled ? COLOR_RED_BR : "", colors_enabled ? COLOR_RESET : "", // Colors for "accepted".
 			accepted_count,
 			accepted_count + rejected_count,
