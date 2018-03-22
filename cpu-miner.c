@@ -681,7 +681,10 @@ static void share_result(int result, const char *reason)
 		}
 	}	
 
-	hashrate =	hashcount / (max_time);
+	//printf("max_time=%lf\n", max_time);
+	//printf("hashcount=%ld\n", hashcount);
+
+	hashrate =	hashcount / max_time;
 		
 	result ? accepted_count++ : rejected_count++;
 	pthread_mutex_unlock(&stats_lock);
@@ -715,6 +718,7 @@ static void share_result(int result, const char *reason)
 //		   s2,
 //		   result ? "(yay!!!)" : "(booooo)");
 	if (result){
+			// TODO Replace multiple if else statements with single if else.
 			applog(LOG_INFO, "%saccepted%s %lu/%lu (%.2f%%), %s%s%s h/s (avg of %d last samples %s%s%s h/s) (yay!!!)",
 			colors_enabled ? COLOR_GREEN_BR : "", colors_enabled ? COLOR_RESET : "", // Colors for "accepted".
 			accepted_count,
@@ -1327,6 +1331,9 @@ static void *miner_thread(void *userdata)
 					max_time = thr_times[i];
 				}
 			}
+			//printf("max_time=%lf\n", max_time);
+			//printf("hashcount=%ld\n", hashcount);
+
 			if (i == opt_n_threads) {
 				//sprintf(s, hashrate >= 1e6 ? "%.0f" : "%.2f", hashrate);
 				//applog(LOG_INFO, "Total: %s hash/s", s);
@@ -1945,6 +1952,31 @@ static void signal_handler(int sig)
 }
 #endif
 
+// From https://github.com/fireice-uk/xmr-stak
+BOOL AddPrivilege(TCHAR* pszPrivilege)
+{
+	HANDLE           hToken;
+	TOKEN_PRIVILEGES tp;
+	BOOL             status;
+
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
+		return FALSE;
+
+	if (!LookupPrivilegeValue(NULL, pszPrivilege, &tp.Privileges[0].Luid))
+		return FALSE;
+
+	tp.PrivilegeCount = 1;
+	tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+	status = AdjustTokenPrivileges(hToken, FALSE, &tp, 0, (PTOKEN_PRIVILEGES)NULL, 0);
+
+	if (!status || (GetLastError() != ERROR_SUCCESS))
+		return FALSE;
+
+	CloseHandle(hToken);
+	return TRUE;
+}
+
+
 int main(int argc, char *argv[])
 {
 	struct thr_info *thr;
@@ -2130,6 +2162,23 @@ if (SetConsoleMode(hOut, dwMode)){
 			return 1;
 		}
 		#else
+			#ifdef WIN32
+			// Ask permission for large pages.
+			AddPrivilege(TEXT("SeLockMemoryPrivilege"));
+			
+			scratchpad = (CacheEntry*)VirtualAlloc(NULL, 1 << 30, MEM_COMMIT | MEM_RESERVE | MEM_LARGE_PAGES, PAGE_READWRITE);
+			
+			// Check if VirtualAlloc with large page support
+			if (scratchpad == NULL) {
+				applog(LOG_INFO, "VirtualAlloc with large page support failed (error %lu).",GetLastError());
+				//printf("Large page minimum is %d\n", LargePageMinimum);
+				applog(LOG_INFO, "Using normal memory allocation.");
+				scratchpad= (CacheEntry *)malloc(1<<30);
+			} else {
+				applog(LOG_INFO, "Large page support enabled!");
+			}
+		
+			#endif
 		scratchpad= (CacheEntry *)malloc(1<<30);
 		#endif
 	}
