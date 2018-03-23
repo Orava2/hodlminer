@@ -1230,8 +1230,7 @@ static void *miner_thread(void *userdata)
 		// Get start time.
 		gettimeofday(&tv_start, NULL);
 
-		// barrier disabled
-		//pthread_barrier_wait( &bar );
+		pthread_barrier_wait( &bar );
 		if(thr_id == 0) {
 		    if (have_stratum) {
                 while (time(NULL) >= g_work_time + 120)
