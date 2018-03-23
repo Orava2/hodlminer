@@ -176,7 +176,11 @@ static unsigned long accepted_count = 0L;
 static unsigned long rejected_count = 0L;
 static double *thr_hashrates;
 static long *thr_hashcounts;
+static long *thr_hashcounts_cumulative;
 static double *thr_times;
+
+// Time when mining started.
+struct timeval tv_mining;
 
 // New average hash rate calculations
 static double average=0.0;
@@ -661,6 +665,8 @@ static void share_result(int result, const char *reason)
 	long hashcount = 0;
 	int i;
 	double max_time=0.0;
+	
+	static struct timeval tv_start, tv_end, diff;
 
 	// Samples for average.
 	#define BUFF_SIZE 100
@@ -671,20 +677,27 @@ static void share_result(int result, const char *reason)
 	static double average=0.0;
 
 	hashrate = 0.;
-	pthread_mutex_lock(&stats_lock);
-	for (i = 0; i < opt_n_threads; i++){
-		hashcount += thr_hashcounts[i];
 	
-		// Take longest thread time.
-		if (thr_times[i] > max_time ){
-			max_time = thr_times[i];
-		}
+	pthread_mutex_lock(&stats_lock);
+	
+	gettimeofday(&tv_end, NULL);
+	if (n==0) {
+		timeval_subtract(&diff, &tv_end, &tv_mining); // If first time (n==0), use mining start time.
+	} else {
+		timeval_subtract(&diff, &tv_end, &tv_start);
+	}
+	tv_start = tv_end;
+	//gettimeofday(&tv_start, NULL);
+	
+	// Calculate the sum of cumulative hash counts.
+	for (i = 0; i < opt_n_threads; i++){
+		hashcount += thr_hashcounts_cumulative[i];
+		thr_hashcounts_cumulative[i]=0;
 	}	
 
-	//printf("max_time=%lf\n", max_time);
 	//printf("hashcount=%ld\n", hashcount);
 
-	hashrate =	hashcount / max_time;
+	hashrate =	hashcount / (diff.tv_sec + 1e-6 * diff.tv_usec);
 		
 	result ? accepted_count++ : rejected_count++;
 	pthread_mutex_unlock(&stats_lock);
@@ -719,7 +732,7 @@ static void share_result(int result, const char *reason)
 //		   result ? "(yay!!!)" : "(booooo)");
 	if (result){
 			// TODO Replace multiple if else statements with single if else.
-			applog(LOG_INFO, "%saccepted%s %lu/%lu (%.2f%%), %s%s%s h/s (avg of %d last samples %s%s%s h/s) (yay!!!)",
+			applog(LOG_INFO, "%saccepted%s %lu/%lu (%.2f%%), %s%s%s h/s (%ldh/%.1fs), avg of %d samples %s%s%s h/s, (yay!!!)",
 			colors_enabled ? COLOR_GREEN_BR : "", colors_enabled ? COLOR_RESET : "", // Colors for "accepted".
 			accepted_count,
 			accepted_count + rejected_count,
@@ -727,12 +740,14 @@ static void share_result(int result, const char *reason)
 			colors_enabled ? COLOR_CYAN_BR : "", // Color for hash rate.
 			s,
 			colors_enabled ? COLOR_RESET : "",
+			hashcount,
+			(diff.tv_sec + 1e-6 * diff.tv_usec),
 			n,
 			colors_enabled ? COLOR_MAGENTA_BR : "", // Color for average hash rate.
 			s2,
 			colors_enabled ? COLOR_RESET : "");
 	} else {
-			applog(LOG_INFO, "%srejected%s %lu/%lu (%.2f%%), %s%s%s h/s (avg of %d last samples %s%s%s h/s) (booooo)",
+			applog(LOG_INFO, "%srejected%s %lu/%lu (%.2f%%), %s%s%s h/s (%ldh/%.1fs), avg of %d samples %s%s%s h/s, (booooo)",
 			colors_enabled ? COLOR_RED_BR : "", colors_enabled ? COLOR_RESET : "", // Colors for "accepted".
 			accepted_count,
 			accepted_count + rejected_count,
@@ -740,6 +755,8 @@ static void share_result(int result, const char *reason)
 			colors_enabled ? COLOR_CYAN_BR : "", // Color for hash rate.
 			s,
 			colors_enabled ? COLOR_RESET : "",
+			hashcount,
+			(diff.tv_sec + 1e-6 * diff.tv_usec),
 			n,
 			colors_enabled ? COLOR_MAGENTA_BR : "", // Color for average hash rate.
 			s2,
@@ -1306,8 +1323,9 @@ static void *miner_thread(void *userdata)
 			pthread_mutex_lock(&stats_lock);
 			thr_hashrates[thr_id] =
 				hashes_done / (diff.tv_sec + 1e-6 * diff.tv_usec);
-			// Let's save hash count to a table.
+			// Let's save hash count to a table and cumulative hash counts.
 			thr_hashcounts[thr_id] = hashes_done;
+			thr_hashcounts_cumulative[thr_id] += hashes_done;
 			// Let's save thread times to a table.
 			thr_times[thr_id] = (diff.tv_sec + 1e-6 * diff.tv_usec);
 			pthread_mutex_unlock(&stats_lock);
@@ -2098,6 +2116,10 @@ if (SetConsoleMode(hOut, dwMode)){
 	if (!thr_hashcounts)
 		return 1;
 
+	thr_hashcounts_cumulative = (long *) calloc(opt_n_threads, sizeof(long));
+	if (!thr_hashcounts_cumulative)
+		return 1;
+
 
 	/* init workio thread info */
 	work_thr_id = opt_n_threads;
@@ -2204,6 +2226,7 @@ if (SetConsoleMode(hOut, dwMode)){
 		algo_names[opt_algo]);
 
 	/* main loop - simply wait for workio thread to exit */
+	gettimeofday(&tv_mining, NULL);		// Start time.
 	pthread_join(thr_info[work_thr_id].pth, NULL);
 
 	applog(LOG_INFO, "workio thread dead, exiting.");
