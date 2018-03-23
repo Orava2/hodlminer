@@ -659,27 +659,28 @@ out:
 
 static void share_result(int result, const char *reason)
 {
+	int i;
 	char s[345];
 	char s2[345];
 	double hashrate;
+	double average_hashrate=0.0;
 	long hashcount = 0;
-	int i;
-	double max_time=0.0;
-	
+	long hashcount_sum = 0;
+	double time=0.0;
+	double time_sum = 0.0;
+		
 	static struct timeval tv_start, tv_end, diff;
 
 	// Samples for average.
 	#define BUFF_SIZE 100
-	static double sample_buffer[BUFF_SIZE];
+	static long sample_buffer_hashcount[BUFF_SIZE];
+	static double sample_buffer_time[BUFF_SIZE];
 	// Position of the lastest sample in the buffer.
 	static int n_pos = 0;
 	static int n=0;
-	static double average=0.0;
-
-	hashrate = 0.;
 	
 	pthread_mutex_lock(&stats_lock);
-	
+	hashrate = 0.;
 	gettimeofday(&tv_end, NULL);
 	if (n==0) {
 		timeval_subtract(&diff, &tv_end, &tv_mining); // If first time (n==0), use mining start time.
@@ -687,7 +688,6 @@ static void share_result(int result, const char *reason)
 		timeval_subtract(&diff, &tv_end, &tv_start);
 	}
 	tv_start = tv_end;
-	//gettimeofday(&tv_start, NULL);
 	
 	// Calculate the sum of cumulative hash counts.
 	for (i = 0; i < opt_n_threads; i++){
@@ -695,33 +695,35 @@ static void share_result(int result, const char *reason)
 		thr_hashcounts_cumulative[i]=0;
 	}	
 
-	//printf("hashcount=%ld\n", hashcount);
-
 	hashrate =	hashcount / (diff.tv_sec + 1e-6 * diff.tv_usec);
-		
+	time = (diff.tv_sec + 1e-6 * diff.tv_usec);
+	
 	result ? accepted_count++ : rejected_count++;
 	pthread_mutex_unlock(&stats_lock);
 	
-	// Calculate average.
 	// Add a new sample to buffer.
-	sample_buffer[n_pos] = hashrate;
+	sample_buffer_hashcount[n_pos] = hashcount;
+	sample_buffer_time[n_pos] = time;
 	// Update position for next sample.
 	n_pos = (n_pos+1)%BUFF_SIZE;
-	average = 0.0;
+	// Calculate average hashcount_sum / time_sum.
+	time_sum = 0.0;
+	hashcount_sum = 0;
 	for (i=0; i<BUFF_SIZE; i++){
-		average += sample_buffer[i];
+		hashcount_sum += sample_buffer_hashcount[i];
+		time_sum += sample_buffer_time[i];
 	}
+	average_hashrate = hashcount_sum / time_sum;
+
 	// n keeps tracks how many samples are in the buffer.
-	// Max value for n is 10
 	if(n<BUFF_SIZE){
 		n++;
 	}else{
 		n=BUFF_SIZE;
 	}
-	average = average/n;
 	
 	sprintf(s, hashrate >= 1e6 ? "%.0f" : "%.2f", hashrate);
-	sprintf(s2, hashrate >= 1e6 ? "%.0f" : "%.2f", average);
+	sprintf(s2, hashrate >= 1e6 ? "%.0f" : "%.2f", average_hashrate);
 //	applog(LOG_INFO, "accepted %lu/%lu (%.2f%%), %s h/s (avg of %d last samples %s h/s) %s",
 //		   accepted_count,
 //		   accepted_count + rejected_count,
