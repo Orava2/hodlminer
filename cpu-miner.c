@@ -1953,6 +1953,7 @@ static void signal_handler(int sig)
 #endif
 
 // From https://github.com/fireice-uk/xmr-stak
+#ifdef WIN32
 BOOL AddPrivilege(TCHAR* pszPrivilege)
 {
 	HANDLE           hToken;
@@ -1975,7 +1976,7 @@ BOOL AddPrivilege(TCHAR* pszPrivilege)
 	CloseHandle(hToken);
 	return TRUE;
 }
-
+#endif
 
 int main(int argc, char *argv[])
 {
