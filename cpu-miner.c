@@ -672,7 +672,7 @@ static void share_result(int result, const char *reason)
 	static struct timeval tv_start, tv_end, diff;
 
 	// Samples for average.
-	#define BUFF_SIZE 100
+	#define BUFF_SIZE 10
 	static long sample_buffer_hashcount[BUFF_SIZE];
 	static double sample_buffer_time[BUFF_SIZE];
 	// Position of the lastest sample in the buffer.
@@ -734,7 +734,7 @@ static void share_result(int result, const char *reason)
 //		   result ? "(yay!!!)" : "(booooo)");
 	if (result){
 			// TODO Replace multiple if else statements with single if else.
-			applog(LOG_INFO, "%saccepted%s %lu/%lu (%.2f%%), %s%s%s h/s (%ldh/%.1fs), avg of %d samples %s%s%s h/s, (yay!!!)",
+			applog(LOG_INFO, "%saccepted%s %lu/%lu (%.2f%%), %s%s%s h/s (%ldh/%.1fs), time avg %d samples %s%s%s h/s, (yay!!!)",
 			colors_enabled ? COLOR_GREEN_BR : "", colors_enabled ? COLOR_RESET : "", // Colors for "accepted".
 			accepted_count,
 			accepted_count + rejected_count,
@@ -749,7 +749,7 @@ static void share_result(int result, const char *reason)
 			s2,
 			colors_enabled ? COLOR_RESET : "");
 	} else {
-			applog(LOG_INFO, "%srejected%s %lu/%lu (%.2f%%), %s%s%s h/s (%ldh/%.1fs), avg of %d samples %s%s%s h/s, (booooo)",
+			applog(LOG_INFO, "%srejected%s %lu/%lu (%.2f%%), %s%s%s h/s (%ldh/%.1fs), time avg %d samples %s%s%s h/s, (booooo)",
 			colors_enabled ? COLOR_RED_BR : "", colors_enabled ? COLOR_RESET : "", // Colors for "accepted".
 			accepted_count,
 			accepted_count + rejected_count,
