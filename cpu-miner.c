@@ -2201,9 +2201,10 @@ if (SetConsoleMode(hOut, dwMode)){
 			} else {
 				applog(LOG_INFO, "Large page support enabled!");
 			}
-		
+			#else
+			scratchpad= (CacheEntry *)malloc(1<<30);
 			#endif
-		scratchpad= (CacheEntry *)malloc(1<<30);
+		
 		#endif
 	}
 
