@@ -182,10 +182,6 @@ static double *thr_times;
 // Time when mining started.
 struct timeval tv_mining;
 
-// New average hash rate calculations
-static double average=0.0;
-static int n_avg=0;
-
 static int colors_enabled;
 
 //char *scratchpad = NULL;
