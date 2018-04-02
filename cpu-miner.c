@@ -1999,6 +1999,7 @@ int main(int argc, char *argv[])
 	long flags;
 	int i;
 
+// Enables ANSI color for Windows 10 console
 #ifdef WIN32
 #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
@@ -2224,7 +2225,7 @@ if (SetConsoleMode(hOut, dwMode)){
 		algo_names[opt_algo]);
 
 	/* main loop - simply wait for workio thread to exit */
-	gettimeofday(&tv_mining, NULL);		// Start time.
+	gettimeofday(&tv_mining, NULL);		// Start time of mining for hash rate calculations.
 	pthread_join(thr_info[work_thr_id].pth, NULL);
 
 	applog(LOG_INFO, "workio thread dead, exiting.");

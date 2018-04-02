@@ -70,14 +70,16 @@ int scanhash_hodl(int threadNumber, int totalThreads, uint32_t *pdata, const Cac
     }
 
     // Search for pattern in psuedorandom data
-    int searchNumber = COMPARE_SIZE / totalThreads;
+    int searchNumber = COMPARE_SIZE / totalThreads; // COMPARE_SIZE=2^18=262144
     int startLoc = threadNumber * searchNumber;
+	// Works OK if totalThreads is power of 2. Otherwise searchNumber startLoc is affected by rounding. 
 
-    for(int32_t k = startLoc; k < startLoc + searchNumber && !work_restart[threadNumber].restart; k+=AES_PARALLEL_N)
+	// k < COMPARE_SIZE - 7 makes sure that Garbage + k + n where max n is 7 (AES_PARALLEL_N - 1) won't cause segmentation fault.
+    for(int32_t k = startLoc; k < startLoc + searchNumber && k < COMPARE_SIZE - AES_PARALLEL_N +1 && !work_restart[threadNumber].restart; k+=AES_PARALLEL_N)
     {
         // Copy data
         for (int n=0; n<AES_PARALLEL_N; ++n) {
-            memcpy(Cache[n].dwords, Garbage + k + n, GARBAGE_SLICE_SIZE);
+            memcpy(Cache[n].dwords, Garbage + k + n, GARBAGE_SLICE_SIZE); // GARBAGE_SLICE_SIZE	(1 << 12) = 4096 bytes
         	//data0[n] = Garbage[k+n].dqwords;
         }
 
