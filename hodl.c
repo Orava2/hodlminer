@@ -83,7 +83,7 @@ int scanhash_hodl(int threadNumber, int totalThreads, uint32_t *pdata, const Cac
         	//data0[n] = Garbage[k+n].dqwords;
         }
 
-        for(int j = 0; j < AES_ITERATIONS; ++j)
+        for(int j = 0; j < AES_ITERATIONS; ++j) // #define AES_ITERATIONS 		15
         {
             __m128i ExpKey[AES_PARALLEL_N][16];
             __m128i ivs[AES_PARALLEL_N];

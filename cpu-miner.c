@@ -100,9 +100,24 @@ static inline void drop_policy(void)
 {
 }
 
+#ifdef WIN32
 static inline void affine_to_cpu(int id, int cpu)
 {
+	if (id == -1)
+		SetProcessAffinityMask(GetCurrentProcess(), 1 << cpu);
+		//applog(LOG_INFO, "SetProcessAffinityMask: %d, status %d", 1 << cpu, SetProcessAffinityMask(GetCurrentProcess(), 1 << cpu) );
+	else {
+		SetThreadAffinityMask(GetCurrentThread(), 1 << cpu);
+		//applog(LOG_INFO, "SetThreadAffinityMask: %d, status %d", 1 << cpu, SetThreadAffinityMask(GetCurrentThread(), 1 << cpu) );
+	}
 }
+#else
+static inline void affine_to_cpu(int id, int cpu)
+{
+
+}
+#endif
+
 #endif
 		
 enum workio_commands {
@@ -130,6 +145,7 @@ bool opt_debug = false;
 static bool opt_drop_priority = false;
 bool opt_protocol = false;
 static bool opt_benchmark = false;
+static bool opt_affinity = false;	// By default processor affinity is off.
 bool opt_redirect = true;
 bool want_longpoll = true;
 bool have_longpoll = false;
@@ -147,6 +163,7 @@ int opt_timeout = 0;
 static int opt_scantime = 5;
 static const bool opt_time = true;
 static enum algos opt_algo = ALGO_HODL;
+static int opt_avg = 10; // Default
 static int opt_n_threads;
 static int num_processors;
 static char *rpc_url;
@@ -178,6 +195,9 @@ static double *thr_hashrates;
 static long *thr_hashcounts;
 static long *thr_hashcounts_cumulative;
 static double *thr_times;
+
+static long *sample_buffer_hashcount;
+static double *sample_buffer_time;
 
 // Time when mining started.
 struct timeval tv_mining;
@@ -225,7 +245,8 @@ Options:\n\
       --no-stratum      disable X-Stratum support\n\
       --no-redirect     ignore requests to change the URL of the mining server\n\
   -q, --quiet           disable per-thread hashmeter output\n\
-  -w, --timing			show timing for execution\n\
+      --timing			show timings for execution\n\
+  -A, --average=N       show time average for hash rate of N samples (default: 10)\n\
   -D, --debug           enable debug output\n\
   -P, --protocol-dump   verbose dump of protocol-level activities\n"
 #ifdef HAVE_SYSLOG_H
@@ -258,6 +279,7 @@ static struct option const options[] = {
 	{ "background", 0, NULL, 'B' },
 #endif
 	{ "benchmark", 0, NULL, 1005 },
+	{ "affinity", 0, NULL, 1016},
 	{ "cert", 1, NULL, 1001 },
 	{ "coinbase-addr", 1, NULL, 1013 },
 	{ "coinbase-sig", 1, NULL, 1015 },
@@ -282,6 +304,7 @@ static struct option const options[] = {
 	{ "syslog", 0, NULL, 'S' },
 #endif
 	{ "threads", 1, NULL, 't' },
+	{ "average", 1, NULL, 'A' },
 	{ "timeout", 1, NULL, 'T' },
 	{ "url", 1, NULL, 'o' },
 	{ "user", 1, NULL, 'u' },
@@ -668,9 +691,10 @@ static void share_result(int result, const char *reason)
 	static struct timeval tv_start, tv_end, diff;
 
 	// Samples for average.
-	#define BUFF_SIZE 10
-	static long sample_buffer_hashcount[BUFF_SIZE];
-	static double sample_buffer_time[BUFF_SIZE];
+	int BUFF_SIZE=opt_avg;
+	//#define BUFF_SIZE 10
+	//These are dynamically allocates in main. static long sample_buffer_hashcount[BUFF_SIZE]; static double sample_buffer_time[BUFF_SIZE];
+	
 	// Position of the lastest sample in the buffer.
 	static int n_pos = 0;
 	static int n=0;
@@ -1211,7 +1235,8 @@ static void *miner_thread(void *userdata)
 
 	/* Cpu affinity only makes sense if the number of threads is a multiple
 	 * of the number of CPUs */
-	if (num_processors > 1 && opt_n_threads % num_processors == 0) {
+//	if (num_processors > 1 && opt_n_threads % num_processors == 0) {
+	if (opt_affinity) { // Parameter --affinity
 		if (!opt_quiet)
 			applog(LOG_INFO, "Binding thread %d to cpu %d",
 			       thr_id, thr_id % num_processors);
@@ -1226,7 +1251,8 @@ static void *miner_thread(void *userdata)
 		// Get start time.
 		gettimeofday(&tv_start, NULL);
 
-		pthread_barrier_wait( &bar );
+		//pthread_barrier_wait( &bar );
+		
 		if(thr_id == 0) {
 		    if (have_stratum) {
                 while (time(NULL) >= g_work_time + 120)
@@ -1682,6 +1708,12 @@ static void parse_arg(int key, char *arg, char *pname)
 			show_usage_and_exit(1);
 		}
 		break;
+	case 'A':
+		v = atoi(arg);
+		if (v < 1 || v > 99999)	/* sanity check */
+			show_usage_and_exit(1);
+		opt_avg = v;
+		break;	
 	case 'B':
 		opt_background = true;
 		break;
@@ -1744,12 +1776,12 @@ static void parse_arg(int key, char *arg, char *pname)
 			show_usage_and_exit(1);
 		opt_timeout = v;
 		break;
-        case 't':
-                v = atoi(arg);
-                if (v < 1 || v > 9999)  /* sanity check */
-                        show_usage_and_exit(1);
-                opt_n_threads = v;
-                break;
+    case 't':
+        v = atoi(arg);
+        if (v < 1 || v > 9999)  /* sanity check */
+        show_usage_and_exit(1);
+        opt_n_threads = v;
+        break;
 	case 'u':
 		free(rpc_user);
 		rpc_user = strdup(arg);
@@ -1848,6 +1880,9 @@ static void parse_arg(int key, char *arg, char *pname)
 		want_longpoll = false;
 		want_stratum = false;
 		have_stratum = false;
+		break;
+	case 1016:
+		opt_affinity = true;
 		break;
 	case 1003:
 		want_longpoll = false;
@@ -2118,6 +2153,14 @@ if (SetConsoleMode(hOut, dwMode)){
 	if (!thr_hashcounts_cumulative)
 		return 1;
 
+	// For average sample rate calculations in function share_result
+	sample_buffer_hashcount = (long *)calloc(opt_avg, sizeof(long));
+	if (!sample_buffer_hashcount)
+		return 1;
+
+	sample_buffer_time = (double *)calloc(opt_avg, sizeof(double));
+	if (!sample_buffer_time)
+		return 1;
 
 	/* init workio thread info */
 	work_thr_id = opt_n_threads;
@@ -2191,7 +2234,7 @@ if (SetConsoleMode(hOut, dwMode)){
 			
 			// Check if VirtualAlloc with large page support
 			if (scratchpad == NULL) {
-				applog(LOG_INFO, "VirtualAlloc with large page support failed (error %lu).",GetLastError());
+				applog(LOG_INFO, "VirtualAlloc cannot use large page support (code %lu).",GetLastError());
 				//printf("Large page minimum is %d\n", LargePageMinimum);
 				applog(LOG_INFO, "Using normal memory allocation.");
 				scratchpad= (CacheEntry *)malloc(1<<30);
