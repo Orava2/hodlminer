@@ -245,8 +245,9 @@ Options:\n\
       --no-stratum      disable X-Stratum support\n\
       --no-redirect     ignore requests to change the URL of the mining server\n\
   -q, --quiet           disable per-thread hashmeter output\n\
-      --timing			show timings for execution\n\
-  -A, --average=N       show time average for hash rate of N samples (default: 10)\n\
+      --timing          show timings for execution\n\
+      --average=N       show time average for hash rate of N samples (default: 10)\n\
+      --affinity        set cpu affinity, bind thread0 to cpu0, thread1 to cpu1 etc.\n\
   -D, --debug           enable debug output\n\
   -P, --protocol-dump   verbose dump of protocol-level activities\n"
 #ifdef HAVE_SYSLOG_H
