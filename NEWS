@@ -5,7 +5,7 @@ Hodlminer 2018 v2
 - NEW: Set CPU affinity by --affinity parameter. Thread0 is bound to CPU0, thread1 to CPU1 etc.
 - NEW: Hodlminer tries to use large/huge page support if support is enabled in Windows. In order to use large page memory allocation
        there have to 1 GB of continous physical memory. Otherwise you get code 1450. The longer you run Windows the more fragmented
-	   memory gets. In best cases I have get 1% increment in hash rate with large page support.  
+	   memory gets. In best cases I have got 1% increment in hash rate with large page support.  
 - FIXED: Now Hodlminer gives more realistic hash rates readings https://github.com/Orava2/hodlminer/issues/1 .
        New hash rate readings are always lower than in version 2018 v1.
 - FIXED: Old version caused segmentation fault when using thread counts 3, 6, 7, 19, 20, 21, 27, 30, 60, 63.
