@@ -20,6 +20,9 @@ Ubuntu and Debian build instructions:
 	./configure CFLAGS="-O3 -march=native"
 	make
 
+	To use Hodlminer with Suprnova run:
+	./hodlminer -o stratum+tcp://hodl.suprnova.cc:4693 -u <username>.<worker_name> -p <worker_password> -q
+
 Windows 64 bit build instructions:
 	...
 	
