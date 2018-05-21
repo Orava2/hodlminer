@@ -16,6 +16,7 @@ Ubuntu and Debian build instructions:
 	sudo apt-get install automake
 	git clone https://github.com/Orava2/hodlminer
 	cd hodlminer
+	chmod u+x autogen.sh
 	./autogen.sh
 	./configure CFLAGS="-O3 -march=native"
 	make
