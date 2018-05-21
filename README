@@ -14,8 +14,8 @@ Ubuntu and Debian build instructions:
 	sudo apt-get install git git-core
 	sudo apt-get install build-essential pkg-config libcurl4-openssl-dev libssl-dev
 	sudo apt-get install automake
-	git clone https://github.com/Optiminer/hodlminer-wolf
-	cd hodlminer-wolf
+	git clone https://github.com/Orava2/hodlminer
+	cd hodlminer
 	./autogen.sh
 	./configure CFLAGS="-O3 -march=native"
 	make
