@@ -10,7 +10,7 @@ Dependencies:
 	jansson			http://www.digip.org/jansson/
 		(jansson is included in-tree)
 
-Ubuntu and Debian build instructions:
+Ubuntu, Debian and Linux Mint build instructions:
 	sudo apt-get install git git-core
 	sudo apt-get install build-essential pkg-config libcurl4-openssl-dev libssl-dev
 	sudo apt-get install automake
