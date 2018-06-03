@@ -14,8 +14,8 @@
 
 typedef union _CacheEntry
 {
-	uint32_t dwords[GARBAGE_SLICE_SIZE >> 2] __attribute__((aligned(16)));
-	__m128i dqwords[GARBAGE_SLICE_SIZE >> 4] __attribute__((aligned(16)));
+	uint32_t dwords[GARBAGE_SLICE_SIZE >> 2] __attribute__((aligned(16))); // GARBAGE_SLICE_SIZE >> 2 = 2048 (16 bit words)
+	__m128i dqwords[GARBAGE_SLICE_SIZE >> 4] __attribute__((aligned(16))); // GARBAGE_SLICE_SIZE >> 4 = 1024 (32 bit words)
 } CacheEntry;
 
 int scanhash_hodl(int thr_id, int totalThreads, uint32_t *pdata, const CacheEntry *scratchpad, const uint32_t *ptarget, unsigned long *hashes_done);

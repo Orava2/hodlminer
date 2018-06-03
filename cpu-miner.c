@@ -145,7 +145,7 @@ bool opt_debug = false;
 static bool opt_drop_priority = false;
 bool opt_protocol = false;
 static bool opt_benchmark = false;
-static bool opt_affinity = false;	// By default processor affinity is off.
+static int opt_affinity = 0;	// By default processor affinity is off.
 bool opt_redirect = true;
 bool want_longpoll = true;
 bool have_longpoll = false;
@@ -247,7 +247,8 @@ Options:\n\
   -q, --quiet           disable per-thread hashmeter output\n\
       --timing          show timings for execution\n\
       --average=N       show time average for hash rate of N samples (default: 10)\n\
-      --affinity        set cpu affinity, bind thread0 to cpu0, thread1 to cpu1 etc.\n\
+      --affinity=N      set cpu affinity, N is step size, bind threads\n\
+                        to cpu(thread_id*N), e.g. thread_01 to CPU(1*N)\n\
   -D, --debug           enable debug output\n\
   -P, --protocol-dump   verbose dump of protocol-level activities\n"
 #ifdef HAVE_SYSLOG_H
@@ -280,7 +281,7 @@ static struct option const options[] = {
 	{ "background", 0, NULL, 'B' },
 #endif
 	{ "benchmark", 0, NULL, 1005 },
-	{ "affinity", 0, NULL, 1016},
+	{ "affinity", 1, NULL, 1016}, // 1 = takes an argument
 	{ "cert", 1, NULL, 1001 },
 	{ "coinbase-addr", 1, NULL, 1013 },
 	{ "coinbase-sig", 1, NULL, 1015 },
@@ -1237,11 +1238,19 @@ static void *miner_thread(void *userdata)
 	/* Cpu affinity only makes sense if the number of threads is a multiple
 	 * of the number of CPUs */
 //	if (num_processors > 1 && opt_n_threads % num_processors == 0) {
-	if (opt_affinity) { // Parameter --affinity
+	if (opt_affinity) { // Parameter --affinity=x
 		if (!opt_quiet)
 			applog(LOG_INFO, "Binding thread %d to cpu %d",
-			       thr_id, thr_id % num_processors);
-		affine_to_cpu(thr_id, thr_id % num_processors);
+			       thr_id, (thr_id*opt_affinity) % num_processors);
+		// opt_affinity=1	opt_affinity=2		opt_affinity=3		opt_affinity=4	
+		// thread CPU			thread CPU			thread CPU		thread CPU
+		// 0	0				0	0	(0*2)		0	0	(0*3)		0	0	(4*0)
+		// 1	1				1	2	(1*2)		1	3	(1*3)		1	4	(1*4)
+		// 2	2				2	4	(2*2)		2	6	(2*6)		2	8	(2*4)
+		// 3	3				3	6	(3*2)		3	9	(3*3)		3	12	(3*4)
+		// 4	4				4	8	(4*2)		4	12	(4*3)		4	16	(4*4)
+		// 5	5				5	10	(5*2)		5	15	(5*3)		5	20	(5*4)
+		affine_to_cpu(thr_id, (thr_id*opt_affinity) % num_processors);
 	}
 	
 	while (1) {
@@ -1883,8 +1892,12 @@ static void parse_arg(int key, char *arg, char *pname)
 		have_stratum = false;
 		break;
 	case 1016:
-		opt_affinity = true;
-		break;
+		v = atoi(arg);
+		if (v < 1 || v > 99999)	/* sanity check */
+			show_usage_and_exit(1);
+//		fprintf(stderr, "Affinity parameter: %d", v);
+		opt_affinity = v;
+		break;	
 	case 1003:
 		want_longpoll = false;
 		break;

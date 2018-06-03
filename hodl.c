@@ -88,11 +88,11 @@ int scanhash_hodl(int threadNumber, int totalThreads, uint32_t *pdata, const Cac
             __m128i ExpKey[AES_PARALLEL_N][16];
             __m128i ivs[AES_PARALLEL_N];
 
-            // use last 4 bytes of first cache as next location
+            // use last 32 bits of first cache as next location
             for(int n=0; n<AES_PARALLEL_N; ++n) {
             	uint32_t nextLocation;
             	if (j == 0) {
-            		nextLocation = Garbage[k+n].dwords[(GARBAGE_SLICE_SIZE >> 2) - 1] & (COMPARE_SIZE - 1); //% COMPARE_SIZE;
+            		nextLocation = Garbage[k+n].dwords[(GARBAGE_SLICE_SIZE >> 2) - 1] & (COMPARE_SIZE - 1); //% COMPARE_SIZE; compare_size -1 = 111111111111111111 this takes the last 18 bits. This 18 bits is used to point to the next 4096 block in  1 GB memory.
             	} else {
             		nextLocation = Cache[n].dwords[(GARBAGE_SLICE_SIZE >> 2) - 1] & (COMPARE_SIZE - 1); //% COMPARE_SIZE;
             	}
