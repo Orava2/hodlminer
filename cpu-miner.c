@@ -678,6 +678,24 @@ out:
 	return rc;
 }
 
+double calc_network_diff(struct work *work )
+{
+   // sample for diff 43.281 : 1c05ea29
+   // todo: endian reversed on longpoll could be zr5 specific...
+   uint32_t nbits = have_longpoll ? work->data[18] : swab32( work->data[18] );
+   uint32_t bits  = ( nbits & 0xffffff );
+   int16_t  shift = ( swab32(nbits) & 0xff ); // 0x1c = 28
+   int m;
+   double d = (double)0x0000ffff / (double)bits;
+   for ( m = shift; m < 29; m++ )
+       d *= 256.0;
+   for ( m = 29; m < shift; m++ )
+       d /= 256.0;
+   // applog(LOG_DEBUG, "net diff: %f -> nbits %x ,shift %u, bits %08x", d, nbits, shift, bits);
+   return d;
+}
+
+
 static void share_result(int result, const char *reason)
 {
 	int i;
@@ -1602,6 +1620,12 @@ static void *stratum_thread(void *userdata)
 			time(&g_work_time);
 			pthread_mutex_unlock(&g_work_lock);
 			if (stratum.job.clean) {
+				// Print the new block height (if changed) and network difficulty.
+				static uint32_t last_bloc_height;
+				if ( last_bloc_height != stratum.block_height ){
+					last_bloc_height = stratum.block_height;
+					applog(LOG_ERR, "New block %d, difficulty %f, pool difficulty %.2f ", stratum.block_height, calc_network_diff(&g_work), stratum.job.diff );
+				}
 				applog(LOG_INFO, "Stratum requested work restart");
 				restart_threads();
 			}
@@ -2289,3 +2313,4 @@ if (SetConsoleMode(hOut, dwMode)){
 
 	return 0;
 }
+
