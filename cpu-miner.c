@@ -1620,11 +1620,11 @@ static void *stratum_thread(void *userdata)
 			time(&g_work_time);
 			pthread_mutex_unlock(&g_work_lock);
 			if (stratum.job.clean) {
-				// Print the new block height (if changed) and network difficulty.
+				// Print the new block height (if changed) and network and stratum difficulty.
 				static uint32_t last_bloc_height;
 				if ( last_bloc_height != stratum.block_height ){
 					last_bloc_height = stratum.block_height;
-					applog(LOG_ERR, "New block %d, difficulty %f, pool difficulty %.2f ", stratum.block_height, calc_network_diff(&g_work), stratum.job.diff );
+					applog(LOG_ERR, "New block %d, difficulty %f, stratum difficulty %.2f ", stratum.block_height, calc_network_diff(&g_work), stratum.job.diff );
 				}
 				applog(LOG_INFO, "Stratum requested work restart");
 				restart_threads();
