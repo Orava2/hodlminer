@@ -50,6 +50,7 @@
 #define COLOR_BLUE    "\x1b[34m"
 #define COLOR_MAGENTA "\x1b[35m"
 #define COLOR_CYAN    "\x1b[36m"
+#define COLOR_WHITE		"\x1b[97m"
 #define COLOR_RED_BR     "\x1b[91m"
 #define COLOR_GREEN_BR   "\x1b[92m"
 #define COLOR_YELLOW_BR  "\x1b[93m"
@@ -1624,7 +1625,11 @@ static void *stratum_thread(void *userdata)
 				static uint32_t last_bloc_height;
 				if ( last_bloc_height != stratum.block_height ){
 					last_bloc_height = stratum.block_height;
-					applog(LOG_ERR, "New block %d, difficulty %f, stratum difficulty %.2f ", stratum.block_height, calc_network_diff(&g_work), stratum.job.diff );
+					if (colors_enabled){
+						applog(LOG_ERR, "NEW BLOCK "COLOR_MAGENTA_BR"%d"COLOR_RESET", difficulty "COLOR_YELLOW_BR"%f"COLOR_RESET", stratum difficulty "COLOR_WHITE"%.2f"COLOR_RESET"", stratum.block_height, calc_network_diff(&g_work), stratum.job.diff );
+					} else {
+						applog(LOG_ERR, "New block %d, difficulty %f, stratum difficulty %.2f ", stratum.block_height, calc_network_diff(&g_work), stratum.job.diff );
+					}
 				}
 				applog(LOG_INFO, "Stratum requested work restart");
 				restart_threads();

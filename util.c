@@ -30,7 +30,6 @@
 #include <mstcpip.h>
 #else
 #include <sys/socket.h>
-#include <sys/endian.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #endif
