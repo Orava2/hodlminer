@@ -1390,10 +1390,11 @@ static void *miner_thread(void *userdata)
 		}
 		if (opt_benchmark && thr_id == opt_n_threads - 1) {
 			double hashrate = 0.;
+			double hashrate_old = 0.; // Old style hashrate
 			long hashcount = 0;
 			max_time = 0;
 			for (i = 0; i < opt_n_threads && thr_hashrates[i]; i++){
-				hashrate += thr_hashrates[i];
+				hashrate_old += thr_hashrates[i]; 
 				hashcount += thr_hashcounts[i];
 				
 				// Take longest thread time.
