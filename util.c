@@ -37,6 +37,9 @@
 #include "miner.h"
 #include "elist.h"
 
+// Avoid namespace collisions with BSD <sys/endian.h>.
+#define le16dec libcperciva_le16dec
+
 #if !HAVE_DECL_LE16DEC
 static inline uint16_t le16dec(const void *pp)
 {
